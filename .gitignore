@@ -23,3 +23,9 @@ yarn-debug.log*
 yarn-error.log*
 
 .firebase
+firestore-debug.log
+pubsub-debug.log
+ui-debug.log
+
+service-account-key
+.env
