@@ -7,7 +7,6 @@ function App() {
   const [todos, setTodos] = useState<Todo[]>([]);
 
   useEffect(() => {
-    console.log("call");
     const unsubscribe = todosRef.onSnapshot((snap) => {
       const newTodos = snap.docs.map((doc) => ({
         id: doc.id,

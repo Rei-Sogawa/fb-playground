@@ -18,3 +18,8 @@ if (!firebase.apps.length) {
 
 export const db = firebase.firestore();
 export const auth = firebase.auth();
+
+if (process.env.REACT_APP_USE_FIRESTORE_EMULATOR === "TRUE")
+  db.useEmulator("localhost", 8080);
+if (process.env.REACT_APP_USE_AUTH_EMULATOR === "TRUE")
+  auth.useEmulator("http://localhost:9099");
