@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 
 import { todosRef } from "./fb/collectionRef";
-import { Todo } from "./fb/models";
+import { Todo } from "./models";
 
 function App() {
   const [todos, setTodos] = useState<Todo[]>([]);
