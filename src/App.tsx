@@ -1,19 +1,13 @@
 import React, { useEffect, useState } from "react";
-import firebase from "firebase/app";
 
-import { db } from "./firebaseApp";
-
-type Todo = {
-  id: string;
-  ref: firebase.firestore.DocumentReference<firebase.firestore.DocumentData>;
-  name: string;
-};
+import { todosRef } from "./fb/collectionRef";
+import { Todo } from "./fb/models";
 
 function App() {
-  const todosRef = db.collection("todos");
   const [todos, setTodos] = useState<Todo[]>([]);
 
   useEffect(() => {
+    console.log("call");
     const unsubscribe = todosRef.onSnapshot((snap) => {
       const newTodos = snap.docs.map((doc) => ({
         id: doc.id,
@@ -23,7 +17,7 @@ function App() {
       setTodos(newTodos);
     });
     return unsubscribe;
-  }, [todosRef]);
+  }, []);
 
   const addTodo = async () => {
     await todosRef.add({ name });
