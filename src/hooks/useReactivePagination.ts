@@ -68,6 +68,7 @@ function useReactivePagination<
   };
 
   const listenMoreDocs = async () => {
+    if (!start) return;
     const forwardOrderSnap = await forwardOrderRef
       .startAfter(start)
       .limit(size)
