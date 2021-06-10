@@ -8,8 +8,8 @@ function useReactivePagination<
     ref: firebase.firestore.DocumentReference<firebase.firestore.DocumentData>;
   }
 >(
-  forwardOrderRef: firebase.firestore.Query<firebase.firestore.DocumentData>,
-  reverseOrderRef: firebase.firestore.Query<firebase.firestore.DocumentData>,
+  forwardOrderQuery: firebase.firestore.Query<firebase.firestore.DocumentData>,
+  reverseOrderQuery: firebase.firestore.Query<firebase.firestore.DocumentData>,
   size: number,
   sortFn: (a: T, b: T) => number
 ) {
@@ -21,11 +21,11 @@ function useReactivePagination<
   const [listeners, setListeners] = useState<(() => void)[]>([]);
 
   const listenDocs = async () => {
-    const forwardOrderSnap = await forwardOrderRef.limit(size).get();
+    const forwardOrderSnap = await forwardOrderQuery.limit(size).get();
     const _start = forwardOrderSnap.docs[forwardOrderSnap.docs.length - 1];
-    setStart(_start);
     if (!_start) return;
-    const listener = reverseOrderRef
+    setStart(_start);
+    const listener = reverseOrderQuery
       .startAt(_start)
       .onSnapshot((reverseOrderSnap) => {
         reverseOrderSnap
@@ -69,15 +69,15 @@ function useReactivePagination<
 
   const listenMoreDocs = async () => {
     if (!start) return;
-    const forwardOrderSnap = await forwardOrderRef
+    const forwardOrderSnap = await forwardOrderQuery
       .startAfter(start)
       .limit(size)
       .get();
     const _end = start;
     const _start = forwardOrderSnap.docs[forwardOrderSnap.docs.length - 1];
-    setStart(_start);
     if (!_start) return;
-    const listener = reverseOrderRef
+    setStart(_start);
+    const listener = reverseOrderQuery
       .startAt(_start)
       .endBefore(_end)
       .onSnapshot((reverseOrderSnap) => {
