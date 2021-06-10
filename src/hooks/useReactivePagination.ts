@@ -2,6 +2,10 @@ import firebase from "firebase/app";
 import "firebase/firestore";
 import { useState } from "react";
 
+// [TODO]
+// - 最初から server 側の doc が 0 個 -> 全 listen する
+// - 途中から server 側の doc が 0 個 -> detachListeners してから、全 listen に切り替える
+
 function useReactivePagination<
   T extends {
     id: string;
