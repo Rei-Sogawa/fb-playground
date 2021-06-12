@@ -1,9 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { db } from "./firebaseApp";
-import firebase from "firebase/app";
-import "firebase/firestore";
-// import ComposeProviders from "./context/ComposeProviders";
-// import { CounterProvider, useCounter } from "./context/Counter";
+import { useUnmount } from "react-use";
 
 import useReactivePagination from "./hooks/useReactivePagination";
 
@@ -13,18 +10,6 @@ const todosRef = db.collection("todos");
 
 function App() {
   const [todos, setTodos] = useState<Todo[]>([]);
-
-  // useEffect(() => {
-  //   const unsubscribe = todosRef.onSnapshot((snap) => {
-  //     const newTodos = snap.docs.map((doc) => ({
-  //       id: doc.id,
-  //       ref: doc.ref,
-  //       ...doc.data(),
-  //     })) as Todo[];
-  //     setTodos(newTodos);
-  //   });
-  //   return unsubscribe;
-  // }, []);
 
   const addTodo = async () => {
     await todosRef.add({
@@ -51,6 +36,8 @@ function App() {
     setTodos(docs as Todo[]);
   }, [docs]);
 
+  useUnmount(() => detachListeners());
+
   return (
     <div>
       <button onClick={listenMoreDocs}>listenMoreDocs</button>
@@ -70,8 +57,16 @@ function App() {
       <ul>
         {todos.map((todo) => (
           <li key={todo.id}>
-            <div style={{ display: "flex", padding: "0.5rem 0" }}>
+            <div
+              style={{
+                display: "flex",
+                padding: "0.5rem 0",
+              }}
+            >
               <div style={{ marginRight: "1rem" }}>{todo.name}</div>
+              <div style={{ marginRight: "1rem" }}>
+                <TodoEditForm todo={todo} />
+              </div>
               <button onClick={() => todo.ref.delete()}>remove</button>
             </div>
           </li>
@@ -81,23 +76,22 @@ function App() {
   );
 }
 
-// function App() {
-//   return (
-//     <ComposeProviders providers={[CounterProvider]}>
-//       <Counter />
-//     </ComposeProviders>
-//   );
-// }
-
-// function Counter() {
-//   const { count, increment, decrement } = useCounter();
-//   return (
-//     <div>
-//       <div>{count}</div>
-//       <button onClick={increment}>increment</button>
-//       <button onClick={decrement}>decrement</button>
-//     </div>
-//   );
-// }
+function TodoEditForm({ todo }: { todo: Todo }) {
+  const [name, setName] = useState(todo.name);
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        todo.ref.update({ name });
+      }}
+    >
+      <input
+        type="text"
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+      />
+    </form>
+  );
+}
 
 export default App;

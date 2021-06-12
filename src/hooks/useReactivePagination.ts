@@ -2,9 +2,9 @@ import firebase from "firebase/app";
 import "firebase/firestore";
 import { useState } from "react";
 
-// [TODO]
-// - 最初から server 側の doc が 0 個 -> 全 listen する
-// - 途中から server 側の doc が 0 個 -> detachListeners してから、全 listen に切り替える
+// [エッジケース]
+// - 最初から server 側の doc が 0 個
+// - 残りの server 側の doc が 0 個
 
 function useReactivePagination<
   T extends {
@@ -17,8 +17,10 @@ function useReactivePagination<
   size: number,
   sortFn: (a: T, b: T) => number
 ) {
+  const [initialized, setInitialized] = useState(false);
+  const [hasMoreDocs, setHasMoreDocs] = useState(false);
   const [docs, setDocs] = useState<T[]>([]);
-  const [start, setStart] =
+  const [startPoint, setStartPoint] =
     useState<
       firebase.firestore.QueryDocumentSnapshot<firebase.firestore.DocumentData>
     >();
@@ -26,98 +28,66 @@ function useReactivePagination<
 
   const listenDocs = async () => {
     const forwardOrderSnap = await forwardOrderQuery.limit(size).get();
-    const _start = forwardOrderSnap.docs[forwardOrderSnap.docs.length - 1];
-    if (!_start) return;
-    setStart(_start);
+    const _startPoint = forwardOrderSnap.docs[forwardOrderSnap.docs.length - 1];
+    if (!_startPoint) return;
+    setStartPoint(_startPoint);
+    setHasMoreDocs(true);
+
     const listener = reverseOrderQuery
-      .startAt(_start)
+      .startAt(_startPoint)
       .onSnapshot((reverseOrderSnap) => {
         reverseOrderSnap
           .docChanges()
           .reverse()
           .forEach((change) => {
             if (change.type === "added") {
-              setDocs((prev) =>
-                [
-                  ...prev,
-                  {
-                    id: change.doc.id,
-                    ref: change.doc.ref,
-                    ...change.doc.data(),
-                  } as T,
-                ].sort(sortFn)
-              );
+              addDoc(change.doc);
+              sortDocs();
             } else if (change.type === "modified") {
-              setDocs((prev) =>
-                [
-                  ...prev.map((prevDoc) =>
-                    prevDoc.id === change.doc.id
-                      ? ({
-                          id: change.doc.id,
-                          ref: change.doc.ref,
-                          ...change.doc.data(),
-                        } as T)
-                      : prevDoc
-                  ),
-                ].sort(sortFn)
-              );
+              modifyDoc(change.doc);
+              sortDocs();
             } else if (change.type === "removed") {
-              setDocs((prev) => [
-                ...prev.filter((prevDoc) => prevDoc.id !== change.doc.id),
-              ]);
+              removeDoc(change.doc);
             }
           });
       });
     setListeners((prev) => [...prev, listener]);
+
+    setInitialized(true);
   };
 
   const listenMoreDocs = async () => {
-    if (!start) return;
+    if (!startPoint) return;
+
     const forwardOrderSnap = await forwardOrderQuery
-      .startAfter(start)
+      .startAfter(startPoint)
       .limit(size)
       .get();
-    const _end = start;
-    const _start = forwardOrderSnap.docs[forwardOrderSnap.docs.length - 1];
-    if (!_start) return;
-    setStart(_start);
+    const endPoint = startPoint;
+    const _startPoint = forwardOrderSnap.docs[forwardOrderSnap.docs.length - 1];
+    if (!_startPoint) {
+      setHasMoreDocs(false);
+      return;
+    }
+    setStartPoint(_startPoint);
+    setHasMoreDocs(true);
+
     const listener = reverseOrderQuery
-      .startAt(_start)
-      .endBefore(_end)
+      .startAt(_startPoint)
+      .endBefore(endPoint)
       .onSnapshot((reverseOrderSnap) => {
         reverseOrderSnap
           .docChanges()
           .reverse()
           .forEach((change) => {
             if (change.type === "added") {
-              setDocs((prev) =>
-                [
-                  ...prev,
-                  {
-                    id: change.doc.id,
-                    ref: change.doc.ref,
-                    ...change.doc.data(),
-                  } as T,
-                ].sort(sortFn)
-              );
+              addDoc(change.doc);
+              sortDocs();
             } else if (change.type === "modified") {
-              setDocs((prev) =>
-                [
-                  ...prev.map((prevDoc) =>
-                    prevDoc.id === change.doc.id
-                      ? ({
-                          id: change.doc.id,
-                          ref: change.doc.ref,
-                          ...change.doc.data(),
-                        } as T)
-                      : prevDoc
-                  ),
-                ].sort(sortFn)
-              );
+              modifyDoc(change.doc);
+              sortDocs();
             } else if (change.type === "removed") {
-              setDocs((prev) => [
-                ...prev.filter((prevDoc) => prevDoc.id !== change.doc.id),
-              ]);
+              removeDoc(change.doc);
             }
           });
       });
@@ -128,8 +98,48 @@ function useReactivePagination<
     listeners.forEach((listener) => listener());
   };
 
+  const addDoc = (
+    doc: firebase.firestore.DocumentChange<firebase.firestore.DocumentData>["doc"]
+  ) => {
+    setDocs((prev) => [
+      ...prev,
+      {
+        id: doc.id,
+        ref: doc.ref,
+        ...doc.data(),
+      } as T,
+    ]);
+  };
+
+  const modifyDoc = (
+    doc: firebase.firestore.DocumentChange<firebase.firestore.DocumentData>["doc"]
+  ) => {
+    setDocs((prev) => [
+      ...prev.map((prevDoc) =>
+        prevDoc.id === doc.id
+          ? ({
+              id: doc.id,
+              ref: doc.ref,
+              ...doc.data(),
+            } as T)
+          : prevDoc
+      ),
+    ]);
+  };
+
+  const removeDoc = (
+    doc: firebase.firestore.DocumentChange<firebase.firestore.DocumentData>["doc"]
+  ) => {
+    setDocs((prev) => [...prev.filter((prevDoc) => prevDoc.id !== doc.id)]);
+  };
+
+  const sortDocs = () => setDocs((prev) => prev.sort(sortFn));
+
   return {
+    initialized,
+    hasMoreDocs,
     docs,
+    endPointDoc: startPoint,
     listenDocs,
     listenMoreDocs,
     detachListeners,
