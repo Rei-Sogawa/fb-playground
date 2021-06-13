@@ -50,7 +50,7 @@ const useReactivePagination: UseReactivePagination = ({
   };
 
   const listenMore = async () => {
-    if (!boundary || !hasMore) return;
+    if (!boundary) return;
 
     const forwardOrderSnap = await forwardOrderQuery
       .startAfter(boundary)

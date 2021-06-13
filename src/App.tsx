@@ -1,7 +1,8 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { db } from "./firebaseApp";
 import { useUnmount } from "react-use";
 import InfiniteScroll from "react-infinite-scroller";
+import { sortBy } from "lodash-es";
 
 import useReactivePagination from "./hooks/useReactivePagination";
 
@@ -21,33 +22,45 @@ function App() {
 
   const [name, setName] = useState("");
 
-  const {
-    docs,
-    loading,
-    hasMoreDocs,
-    listenDocs,
-    listenMoreDocs,
-    detachListeners,
-  } = useReactivePagination(
-    todosRef.orderBy("name", "asc"),
-    todosRef.orderBy("name", "desc"),
-    5,
-    (a: any, b: any) => a.name - b.name
-  );
+  const { queryDocSnaps, hasMore, listen, listenMore, detachListeners } =
+    useReactivePagination({
+      forwardOrderQuery: todosRef.orderBy("name", "asc"),
+      reverseOrderQuery: todosRef.orderBy("name", "desc"),
+      limit: 5,
+    });
 
   useEffect(() => {
-    listenDocs();
+    listen();
   }, []);
 
   useEffect(() => {
-    setTodos(docs as Todo[]);
-  }, [docs]);
+    const todos = sortBy(
+      queryDocSnaps.map(
+        (queryDocSnap) =>
+          ({
+            id: queryDocSnap.id,
+            ref: queryDocSnap.ref,
+            ...queryDocSnap.data(),
+          } as Todo)
+      ),
+      "name"
+    );
+    setTodos(todos);
+  }, [queryDocSnaps]);
 
   useUnmount(() => detachListeners());
 
+  const [loading, setLoading] = useState(false);
+  const handleLoadMore = async () => {
+    if (loading) return;
+    setLoading(true);
+    await listenMore();
+    setLoading(false);
+  };
+
   return (
     <div>
-      <button onClick={listenMoreDocs}>listenMoreDocs</button>
+      <button onClick={listenMore}>listenMoreDocs</button>
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -61,15 +74,7 @@ function App() {
         />
       </form>
 
-      <InfiniteScroll
-        pageStart={0}
-        loadMore={(page) => {
-          console.log(page);
-          listenMoreDocs();
-        }}
-        hasMore={hasMoreDocs && !loading}
-        loader={<div key="loader">Loading ...</div>}
-      >
+      <InfiniteScroll pageStart={0} loadMore={handleLoadMore} hasMore={hasMore}>
         <ul>
           {todos.map((todo) => (
             <li key={todo.id}>
