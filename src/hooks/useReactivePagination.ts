@@ -7,7 +7,6 @@ type UseReactivePagination = (option: {
   reverseOrderQuery: firebase.firestore.Query;
   limit: number;
 }) => {
-  loading: boolean;
   error: firebase.firestore.FirestoreError | undefined;
   hasMore: boolean;
   queryDocSnaps: firebase.firestore.QueryDocumentSnapshot[];
@@ -21,7 +20,6 @@ const useReactivePagination: UseReactivePagination = ({
   reverseOrderQuery,
   limit,
 }) => {
-  const [loading, setLoading] = useState(false);
   const [error, setError] =
     useState<firebase.firestore.FirestoreError | undefined>(undefined);
 
@@ -35,12 +33,10 @@ const useReactivePagination: UseReactivePagination = ({
   const [listeners, setListeners] = useState<(() => void)[]>([]);
 
   const listen = async () => {
-    setLoading(true);
-
     const forwardOrderSnap = await forwardOrderQuery.limit(limit).get();
     const _boundary = forwardOrderSnap.docs[forwardOrderSnap.docs.length - 1];
+
     if (!_boundary) {
-      setLoading(false);
       return;
     }
 
@@ -51,24 +47,20 @@ const useReactivePagination: UseReactivePagination = ({
       .startAt(_boundary)
       .onSnapshot(handleSnapshot, setError);
     setListeners((prev) => [...prev, listener]);
-
-    setLoading(false);
   };
 
   const listenMore = async () => {
     if (!boundary || !hasMore) return;
-    setLoading(true);
 
     const forwardOrderSnap = await forwardOrderQuery
       .startAfter(boundary)
       .limit(limit)
       .get();
-
     const prevBoundary = boundary;
     const _boundary = forwardOrderSnap.docs[forwardOrderSnap.docs.length - 1];
+
     if (!_boundary) {
       setHasMore(false);
-      setLoading(false);
       return;
     }
 
@@ -80,8 +72,6 @@ const useReactivePagination: UseReactivePagination = ({
       .endBefore(prevBoundary)
       .onSnapshot(handleSnapshot, setError);
     setListeners((prev) => [...prev, listener]);
-
-    setLoading(false);
   };
 
   const detachListeners = () => listeners.forEach((listener) => listener());
@@ -110,7 +100,6 @@ const useReactivePagination: UseReactivePagination = ({
   };
 
   return {
-    loading,
     error,
     hasMore,
     queryDocSnaps,
