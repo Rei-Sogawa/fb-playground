@@ -22,40 +22,59 @@ function App() {
 
   const [name, setName] = useState("");
 
-  const { queryDocSnaps, hasMore, listen, listenMore, detachListeners } =
+  const { docSnaps, hasMore, listen, listenMore, detachListeners } =
     useReactivePagination({
       forwardOrderQuery: todosRef.orderBy("name", "asc"),
       reverseOrderQuery: todosRef.orderBy("name", "desc"),
       limit: 5,
     });
 
+  const [initialized, setInitialized] = useState(false);
   useEffect(() => {
-    listen();
+    (async () => await listen())();
+    setInitialized(true);
   }, []);
 
   useEffect(() => {
+    if (initialized && docSnaps.length === 0) {
+      const listener = todosRef
+        .orderBy("name", "asc")
+        .onSnapshot(({ docs }) => {
+          setTodos(
+            docs.map(
+              (doc) => ({ id: doc.id, ref: doc.ref, ...doc.data() } as Todo)
+            )
+          );
+        });
+      return listener;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialized]);
+
+  useEffect(() => {
     const todos = sortBy(
-      queryDocSnaps.map(
-        (queryDocSnap) =>
+      docSnaps.map(
+        (docSnap) =>
           ({
-            id: queryDocSnap.id,
-            ref: queryDocSnap.ref,
-            ...queryDocSnap.data(),
+            id: docSnap.id,
+            ref: docSnap.ref,
+            ...docSnap.data(),
           } as Todo)
       ),
       "name"
     );
     setTodos(todos);
-  }, [queryDocSnaps]);
+  }, [docSnaps]);
 
   useUnmount(() => detachListeners());
 
-  const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+
   const handleLoadMore = async () => {
-    if (loading) return;
-    setLoading(true);
+    if (loadingMore) return;
+    setLoadingMore(true);
     await listenMore();
-    setLoading(false);
+    setLoadingMore(false);
   };
 
   return (

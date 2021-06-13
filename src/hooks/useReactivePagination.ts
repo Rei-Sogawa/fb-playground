@@ -9,7 +9,7 @@ type UseReactivePagination = (option: {
 }) => {
   error: firebase.firestore.FirestoreError | undefined;
   hasMore: boolean;
-  queryDocSnaps: firebase.firestore.QueryDocumentSnapshot[];
+  docSnaps: firebase.firestore.QueryDocumentSnapshot[];
   listen: () => void;
   listenMore: () => void;
   detachListeners: () => void;
@@ -23,7 +23,7 @@ const useReactivePagination: UseReactivePagination = ({
   const [error, setError] =
     useState<firebase.firestore.FirestoreError | undefined>(undefined);
 
-  const [queryDocSnaps, setQueryDocSnaps] = useState<
+  const [docSnaps, setDocSnaps] = useState<
     firebase.firestore.QueryDocumentSnapshot[]
   >([]);
   const [boundary, setBoundary] =
@@ -74,7 +74,10 @@ const useReactivePagination: UseReactivePagination = ({
     setListeners((prev) => [...prev, listener]);
   };
 
-  const detachListeners = () => listeners.forEach((listener) => listener());
+  const detachListeners = () => {
+    listeners.forEach((listener) => listener());
+    setListeners([]);
+  };
 
   const handleSnapshot = (
     reverseOrderSnap: firebase.firestore.QuerySnapshot
@@ -84,15 +87,15 @@ const useReactivePagination: UseReactivePagination = ({
       .reverse()
       .forEach((change) => {
         if (change.type === "added") {
-          setQueryDocSnaps((prev) => [...prev, change.doc]);
+          setDocSnaps((prev) => [...prev, change.doc]);
         } else if (change.type === "modified") {
-          setQueryDocSnaps((prev) => [
+          setDocSnaps((prev) => [
             ...prev.map((queryDocSnap) =>
               queryDocSnap.id === change.doc.id ? change.doc : queryDocSnap
             ),
           ]);
         } else if (change.type === "removed") {
-          setQueryDocSnaps((prev) => [
+          setDocSnaps((prev) => [
             ...prev.filter((queryDocSnap) => queryDocSnap.id !== change.doc.id),
           ]);
         }
@@ -102,7 +105,7 @@ const useReactivePagination: UseReactivePagination = ({
   return {
     error,
     hasMore,
-    queryDocSnaps,
+    docSnaps,
     listen,
     listenMore,
     detachListeners,
