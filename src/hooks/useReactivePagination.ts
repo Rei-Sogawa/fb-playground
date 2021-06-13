@@ -24,12 +24,14 @@ const useReactivePagination: UseReactivePagination = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] =
     useState<firebase.firestore.FirestoreError | undefined>(undefined);
-  const [hasMore, setHasMore] = useState(false);
+
   const [queryDocSnaps, setQueryDocSnaps] = useState<
     firebase.firestore.QueryDocumentSnapshot[]
   >([]);
   const [boundary, setBoundary] =
     useState<firebase.firestore.QueryDocumentSnapshot | undefined>(undefined);
+  const [hasMore, setHasMore] = useState(false);
+
   const [listeners, setListeners] = useState<(() => void)[]>([]);
 
   const listen = async () => {
