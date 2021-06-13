@@ -9,6 +9,7 @@ type UseReactivePagination = (option: {
 }) => {
   error: firebase.firestore.FirestoreError | undefined;
   hasMore: boolean;
+  boundary: firebase.firestore.QueryDocumentSnapshot | undefined;
   docSnaps: firebase.firestore.QueryDocumentSnapshot[];
   listen: () => void;
   listenMore: () => void;
@@ -105,6 +106,7 @@ const useReactivePagination: UseReactivePagination = ({
   return {
     error,
     hasMore,
+    boundary,
     docSnaps,
     listen,
     listenMore,
