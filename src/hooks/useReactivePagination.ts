@@ -2,148 +2,120 @@ import firebase from "firebase/app";
 import "firebase/firestore";
 import { useState } from "react";
 
-// [エッジケース]
-// - 最初から server 側の doc が 0 個
-// - 残りの server 側の doc が 0 個
+type UseReactivePagination = (option: {
+  forwardOrderQuery: firebase.firestore.Query;
+  reverseOrderQuery: firebase.firestore.Query;
+  limit: number;
+}) => {
+  loading: boolean;
+  error: firebase.firestore.FirestoreError | undefined;
+  hasMore: boolean;
+  queryDocSnaps: firebase.firestore.QueryDocumentSnapshot[];
+  listen: () => void;
+  listenMore: () => void;
+  detachListeners: () => void;
+};
 
-function useReactivePagination<
-  T extends {
-    id: string;
-    ref: firebase.firestore.DocumentReference<firebase.firestore.DocumentData>;
-  }
->(
-  forwardOrderQuery: firebase.firestore.Query<firebase.firestore.DocumentData>,
-  reverseOrderQuery: firebase.firestore.Query<firebase.firestore.DocumentData>,
-  size: number,
-  sortFn: (a: T, b: T) => number
-) {
-  const [initialized, setInitialized] = useState(false);
-  const [hasMoreDocs, setHasMoreDocs] = useState(false);
-  const [docs, setDocs] = useState<T[]>([]);
-  const [startPoint, setStartPoint] =
-    useState<
-      firebase.firestore.QueryDocumentSnapshot<firebase.firestore.DocumentData>
-    >();
+const useReactivePagination: UseReactivePagination = ({
+  forwardOrderQuery,
+  reverseOrderQuery,
+  limit,
+}) => {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] =
+    useState<firebase.firestore.FirestoreError | undefined>(undefined);
+  const [hasMore, setHasMore] = useState(false);
+  const [queryDocSnaps, setQueryDocSnaps] = useState<
+    firebase.firestore.QueryDocumentSnapshot[]
+  >([]);
+  const [boundary, setBoundary] =
+    useState<firebase.firestore.QueryDocumentSnapshot | undefined>(undefined);
   const [listeners, setListeners] = useState<(() => void)[]>([]);
 
-  const listenDocs = async () => {
-    const forwardOrderSnap = await forwardOrderQuery.limit(size).get();
-    const _startPoint = forwardOrderSnap.docs[forwardOrderSnap.docs.length - 1];
-    if (!_startPoint) return;
-    setStartPoint(_startPoint);
-    setHasMoreDocs(true);
+  const listen = async () => {
+    setLoading(true);
 
-    const listener = reverseOrderQuery
-      .startAt(_startPoint)
-      .onSnapshot((reverseOrderSnap) => {
-        reverseOrderSnap
-          .docChanges()
-          .reverse()
-          .forEach((change) => {
-            if (change.type === "added") {
-              addDoc(change.doc);
-              sortDocs();
-            } else if (change.type === "modified") {
-              modifyDoc(change.doc);
-              sortDocs();
-            } else if (change.type === "removed") {
-              removeDoc(change.doc);
-            }
-          });
-      });
-    setListeners((prev) => [...prev, listener]);
-
-    setInitialized(true);
-  };
-
-  const listenMoreDocs = async () => {
-    if (!startPoint) return;
-
-    const forwardOrderSnap = await forwardOrderQuery
-      .startAfter(startPoint)
-      .limit(size)
-      .get();
-    const endPoint = startPoint;
-    const _startPoint = forwardOrderSnap.docs[forwardOrderSnap.docs.length - 1];
-    if (!_startPoint) {
-      setHasMoreDocs(false);
+    const forwardOrderSnap = await forwardOrderQuery.limit(limit).get();
+    const _boundary = forwardOrderSnap.docs[forwardOrderSnap.docs.length - 1];
+    if (!_boundary) {
+      setLoading(false);
       return;
     }
-    setStartPoint(_startPoint);
-    setHasMoreDocs(true);
+
+    setBoundary(_boundary);
+    setHasMore(forwardOrderSnap.docs.length === limit);
 
     const listener = reverseOrderQuery
-      .startAt(_startPoint)
-      .endBefore(endPoint)
-      .onSnapshot((reverseOrderSnap) => {
-        reverseOrderSnap
-          .docChanges()
-          .reverse()
-          .forEach((change) => {
-            if (change.type === "added") {
-              addDoc(change.doc);
-              sortDocs();
-            } else if (change.type === "modified") {
-              modifyDoc(change.doc);
-              sortDocs();
-            } else if (change.type === "removed") {
-              removeDoc(change.doc);
-            }
-          });
-      });
+      .startAt(_boundary)
+      .onSnapshot(handleSnapshot, setError);
     setListeners((prev) => [...prev, listener]);
+
+    setLoading(false);
   };
 
-  const detachListeners = () => {
-    listeners.forEach((listener) => listener());
+  const listenMore = async () => {
+    if (!boundary || !hasMore) return;
+    setLoading(true);
+
+    const forwardOrderSnap = await forwardOrderQuery
+      .startAfter(boundary)
+      .limit(limit)
+      .get();
+
+    const prevBoundary = boundary;
+    const _boundary = forwardOrderSnap.docs[forwardOrderSnap.docs.length - 1];
+    if (!_boundary) {
+      setHasMore(false);
+      setLoading(false);
+      return;
+    }
+
+    setBoundary(_boundary);
+    setHasMore(forwardOrderSnap.docs.length === limit);
+
+    const listener = reverseOrderQuery
+      .startAt(_boundary)
+      .endBefore(prevBoundary)
+      .onSnapshot(handleSnapshot, setError);
+    setListeners((prev) => [...prev, listener]);
+
+    setLoading(false);
   };
 
-  const addDoc = (
-    doc: firebase.firestore.DocumentChange<firebase.firestore.DocumentData>["doc"]
+  const detachListeners = () => listeners.forEach((listener) => listener());
+
+  const handleSnapshot = (
+    reverseOrderSnap: firebase.firestore.QuerySnapshot
   ) => {
-    setDocs((prev) => [
-      ...prev,
-      {
-        id: doc.id,
-        ref: doc.ref,
-        ...doc.data(),
-      } as T,
-    ]);
+    reverseOrderSnap
+      .docChanges()
+      .reverse()
+      .forEach((change) => {
+        if (change.type === "added") {
+          setQueryDocSnaps((prev) => [...prev, change.doc]);
+        } else if (change.type === "modified") {
+          setQueryDocSnaps((prev) => [
+            ...prev.map((queryDocSnap) =>
+              queryDocSnap.id === change.doc.id ? change.doc : queryDocSnap
+            ),
+          ]);
+        } else if (change.type === "removed") {
+          setQueryDocSnaps((prev) => [
+            ...prev.filter((queryDocSnap) => queryDocSnap.id !== change.doc.id),
+          ]);
+        }
+      });
   };
-
-  const modifyDoc = (
-    doc: firebase.firestore.DocumentChange<firebase.firestore.DocumentData>["doc"]
-  ) => {
-    setDocs((prev) => [
-      ...prev.map((prevDoc) =>
-        prevDoc.id === doc.id
-          ? ({
-              id: doc.id,
-              ref: doc.ref,
-              ...doc.data(),
-            } as T)
-          : prevDoc
-      ),
-    ]);
-  };
-
-  const removeDoc = (
-    doc: firebase.firestore.DocumentChange<firebase.firestore.DocumentData>["doc"]
-  ) => {
-    setDocs((prev) => [...prev.filter((prevDoc) => prevDoc.id !== doc.id)]);
-  };
-
-  const sortDocs = () => setDocs((prev) => prev.sort(sortFn));
 
   return {
-    initialized,
-    hasMoreDocs,
-    docs,
-    endPointDoc: startPoint,
-    listenDocs,
-    listenMoreDocs,
+    loading,
+    error,
+    hasMore,
+    queryDocSnaps,
+    listen,
+    listenMore,
     detachListeners,
   };
-}
+};
 
 export default useReactivePagination;
