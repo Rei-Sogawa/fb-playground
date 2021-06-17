@@ -9,7 +9,7 @@ type UseReactivePagination = (option: {
 }) => {
   initialized: boolean;
   updating: boolean;
-  error: firebase.firestore.FirestoreError | undefined;
+  error?: firebase.firestore.FirestoreError;
   hasMore: boolean;
   docSnaps: firebase.firestore.DocumentSnapshot[];
   listen: () => void;
@@ -24,11 +24,10 @@ const useReactivePagination: UseReactivePagination = ({
 }) => {
   const [initialized, setInitialized] = useState(false);
   const [updating, setUpdating] = useState(false);
-  const [error, setError] = useState<firebase.firestore.FirestoreError | undefined>(undefined);
+  const [error, setError] = useState<firebase.firestore.FirestoreError>();
 
   const [docSnaps, setDocSnaps] = useState<firebase.firestore.DocumentSnapshot[]>([]);
-  const [boundary, setBoundary] =
-    useState<firebase.firestore.DocumentSnapshot | undefined>(undefined);
+  const [boundary, setBoundary] = useState<firebase.firestore.DocumentSnapshot>();
   const [hasMore, setHasMore] = useState(false);
   const [listeners, setListeners] = useState<(() => void)[]>([]);
 
