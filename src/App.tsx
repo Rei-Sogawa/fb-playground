@@ -44,22 +44,16 @@ function App() {
   };
 
   const [name, setName] = useState("");
-  const addTodo = async () => {
-    await todosRef.add({
-      name,
-    });
+  const handleSubmit: React.FormEventHandler<HTMLFormElement> = async (e) => {
+    e.preventDefault();
+    await todosRef.add({ name });
     setName("");
   };
 
   return (
     <div>
       <button onClick={listenMore}>listenMoreDocs</button>
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          addTodo();
-        }}
-      >
+      <form onSubmit={handleSubmit}>
         <input type="text" value={name} onChange={(e) => setName(e.target.value)} />
       </form>
 
@@ -89,14 +83,13 @@ function App() {
 
 function TodoEditForm({ todo }: { todo: Todo }) {
   const [name, setName] = useState(todo.name);
-  const updateTodo = () => todo.ref.update({ name });
+  const handleSubmit: React.FormEventHandler<HTMLFormElement> = async (e) => {
+    e.preventDefault();
+    await todo.ref.update({ name });
+    setName("");
+  };
   return (
-    <form
-      onSubmit={(e) => {
-        e.preventDefault();
-        updateTodo();
-      }}
-    >
+    <form onSubmit={handleSubmit}>
       <input type="text" value={name} onChange={(e) => setName(e.target.value)} />
     </form>
   );
