@@ -1,16 +1,17 @@
 import firebase from "firebase/app";
 import "firebase/firestore";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 type UseReactivePagination = (option: {
   forwardOrderQuery: firebase.firestore.Query;
   reverseOrderQuery: firebase.firestore.Query;
   limit: number;
 }) => {
+  initialized: boolean;
+  updating: boolean;
   error: firebase.firestore.FirestoreError | undefined;
   hasMore: boolean;
-  boundary: firebase.firestore.QueryDocumentSnapshot | undefined;
-  docSnaps: firebase.firestore.QueryDocumentSnapshot[];
+  docSnaps: firebase.firestore.DocumentSnapshot[];
   listen: () => void;
   listenMore: () => void;
   detachListeners: () => void;
@@ -21,57 +22,58 @@ const useReactivePagination: UseReactivePagination = ({
   reverseOrderQuery,
   limit,
 }) => {
-  const [error, setError] =
-    useState<firebase.firestore.FirestoreError | undefined>(undefined);
-
-  const [docSnaps, setDocSnaps] = useState<
-    firebase.firestore.QueryDocumentSnapshot[]
-  >([]);
+  const [initialized, setInitialized] = useState(false);
+  const [updating, setUpdating] = useState(false);
+  const [error, setError] = useState<firebase.firestore.FirestoreError | undefined>(undefined);
+  const [docSnaps, setDocSnaps] = useState<firebase.firestore.DocumentSnapshot[]>([]);
   const [boundary, setBoundary] =
-    useState<firebase.firestore.QueryDocumentSnapshot | undefined>(undefined);
+    useState<firebase.firestore.DocumentSnapshot | undefined>(undefined);
   const [hasMore, setHasMore] = useState(false);
-
   const [listeners, setListeners] = useState<(() => void)[]>([]);
 
   const listen = async () => {
-    const forwardOrderSnap = await forwardOrderQuery.limit(limit).get();
-    const _boundary = forwardOrderSnap.docs[forwardOrderSnap.docs.length - 1];
+    setUpdating(true);
+    await _listen();
+    setUpdating(false);
+  };
 
+  const _listen = async () => {
+    const forwardOrderSnap = await forwardOrderQuery.limit(limit).get();
+
+    const _boundary = forwardOrderSnap.docs[forwardOrderSnap.docs.length - 1];
     if (!_boundary) {
       return;
     }
-
     setBoundary(_boundary);
-    setHasMore(forwardOrderSnap.docs.length === limit);
 
-    const listener = reverseOrderQuery
-      .startAt(_boundary)
-      .onSnapshot(handleSnapshot, setError);
+    const listener = reverseOrderQuery.startAt(_boundary).onSnapshot(handleOnSnapshot, setError);
     setListeners((prev) => [...prev, listener]);
+
+    setInitialized(true);
   };
 
   const listenMore = async () => {
+    setUpdating(true);
+    await _listenMore();
+    setUpdating(false);
+  };
+
+  const _listenMore = async () => {
     if (!boundary) return;
 
-    const forwardOrderSnap = await forwardOrderQuery
-      .startAfter(boundary)
-      .limit(limit)
-      .get();
+    const forwardOrderSnap = await forwardOrderQuery.startAfter(boundary).limit(limit).get();
+
     const prevBoundary = boundary;
     const _boundary = forwardOrderSnap.docs[forwardOrderSnap.docs.length - 1];
-
     if (!_boundary) {
-      setHasMore(false);
       return;
     }
-
     setBoundary(_boundary);
-    setHasMore(forwardOrderSnap.docs.length === limit);
 
     const listener = reverseOrderQuery
       .startAt(_boundary)
       .endBefore(prevBoundary)
-      .onSnapshot(handleSnapshot, setError);
+      .onSnapshot(handleOnSnapshot, setError);
     setListeners((prev) => [...prev, listener]);
   };
 
@@ -80,9 +82,7 @@ const useReactivePagination: UseReactivePagination = ({
     setListeners([]);
   };
 
-  const handleSnapshot = (
-    reverseOrderSnap: firebase.firestore.QuerySnapshot
-  ) => {
+  const handleOnSnapshot = (reverseOrderSnap: firebase.firestore.QuerySnapshot) => {
     reverseOrderSnap
       .docChanges()
       .reverse()
@@ -91,22 +91,31 @@ const useReactivePagination: UseReactivePagination = ({
           setDocSnaps((prev) => [...prev, change.doc]);
         } else if (change.type === "modified") {
           setDocSnaps((prev) => [
-            ...prev.map((queryDocSnap) =>
-              queryDocSnap.id === change.doc.id ? change.doc : queryDocSnap
-            ),
+            ...prev.map((docSnap) => (docSnap.id === change.doc.id ? change.doc : docSnap)),
           ]);
         } else if (change.type === "removed") {
-          setDocSnaps((prev) => [
-            ...prev.filter((queryDocSnap) => queryDocSnap.id !== change.doc.id),
-          ]);
+          setDocSnaps((prev) => [...prev.filter((docSnap) => docSnap.id !== change.doc.id)]);
         }
       });
   };
 
+  useEffect(() => {
+    if (boundary) {
+      return forwardOrderQuery
+        .startAfter(boundary)
+        .limit(1)
+        .onSnapshot((snap) => {
+          setHasMore(snap.docs.length === 1);
+        });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [boundary]);
+
   return {
+    initialized,
+    updating,
     error,
     hasMore,
-    boundary,
     docSnaps,
     listen,
     listenMore,
