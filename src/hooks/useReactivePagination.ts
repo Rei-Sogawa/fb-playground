@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 type UseReactivePagination = (option: {
   forwardOrderQuery: firebase.firestore.Query;
   reverseOrderQuery: firebase.firestore.Query;
-  limit: number;
+  size: number;
 }) => {
   initialized: boolean;
   updating: boolean;
@@ -20,11 +20,12 @@ type UseReactivePagination = (option: {
 const useReactivePagination: UseReactivePagination = ({
   forwardOrderQuery,
   reverseOrderQuery,
-  limit,
+  size,
 }) => {
   const [initialized, setInitialized] = useState(false);
   const [updating, setUpdating] = useState(false);
   const [error, setError] = useState<firebase.firestore.FirestoreError | undefined>(undefined);
+
   const [docSnaps, setDocSnaps] = useState<firebase.firestore.DocumentSnapshot[]>([]);
   const [boundary, setBoundary] =
     useState<firebase.firestore.DocumentSnapshot | undefined>(undefined);
@@ -38,7 +39,7 @@ const useReactivePagination: UseReactivePagination = ({
   };
 
   const _listen = async () => {
-    const forwardOrderSnap = await forwardOrderQuery.limit(limit).get();
+    const forwardOrderSnap = await forwardOrderQuery.limit(size).get();
 
     const _boundary = forwardOrderSnap.docs[forwardOrderSnap.docs.length - 1];
     if (!_boundary) {
@@ -61,7 +62,7 @@ const useReactivePagination: UseReactivePagination = ({
   const _listenMore = async () => {
     if (!boundary) return;
 
-    const forwardOrderSnap = await forwardOrderQuery.startAfter(boundary).limit(limit).get();
+    const forwardOrderSnap = await forwardOrderQuery.startAfter(boundary).limit(size).get();
 
     const prevBoundary = boundary;
     const _boundary = forwardOrderSnap.docs[forwardOrderSnap.docs.length - 1];

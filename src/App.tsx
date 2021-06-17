@@ -17,7 +17,7 @@ function App() {
     useReactivePagination({
       forwardOrderQuery: todosRef.orderBy("name", "asc"),
       reverseOrderQuery: todosRef.orderBy("name", "desc"),
-      limit: 5,
+      size: 5,
     });
 
   useMount(() => listen());
