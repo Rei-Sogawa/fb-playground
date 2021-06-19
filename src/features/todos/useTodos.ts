@@ -19,7 +19,12 @@ const useTodos = () => {
     size: 5,
   });
 
-  useMount(() => listen().then(() => setCalledListen(true)));
+  useMount(() => {
+    setCalling(true);
+    listen()
+      .then(() => setCalledListen(true))
+      .finally(() => setCalling(false));
+  });
   useUnmount(() => detachListeners());
 
   useEffect(() => {

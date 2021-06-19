@@ -8,7 +8,7 @@ const App = () => {
     <Router>
       <div style={{ width: "720px", margin: "0 auto" }}>
         <div style={{ display: "flex", marginBottom: "1rem" }}>
-          <Link to="/todos" style={{ marginRight: "1rem" }}>
+          <Link to="/todos" style={{ marginRight: ".5rem" }}>
             Todo
           </Link>
           <Link to="counter">Counter</Link>

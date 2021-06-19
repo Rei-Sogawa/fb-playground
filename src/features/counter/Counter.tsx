@@ -17,7 +17,11 @@ const Count = () => {
 
 const Increment = () => {
   const { increment } = useCounter();
-  return <button onClick={increment}>increment</button>;
+  return (
+    <button onClick={increment} style={{ marginRight: ".5rem" }}>
+      increment
+    </button>
+  );
 };
 
 const Decrement = () => {
