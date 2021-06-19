@@ -7,13 +7,12 @@ type UseReactivePagination = (option: {
   reverseOrderQuery: firebase.firestore.Query;
   size: number;
 }) => {
-  initialized: boolean;
-  settingListener: boolean;
-  error?: firebase.firestore.FirestoreError;
-  hasMore: boolean;
   docs: firebase.firestore.DocumentData[];
-  listen: () => void;
-  listenMore: () => void;
+  boundary?: firebase.firestore.DocumentData;
+  hasMore: boolean;
+  error?: firebase.firestore.FirestoreError;
+  listen: () => Promise<void>;
+  listenMore: () => Promise<void>;
   detachListeners: () => void;
 };
 
@@ -22,8 +21,6 @@ const useReactivePagination: UseReactivePagination = ({
   reverseOrderQuery,
   size,
 }) => {
-  const [initialized, setInitialized] = useState(false);
-  const [settingListener, setSettingListener] = useState(false);
   const [error, setError] = useState<firebase.firestore.FirestoreError>();
   const [docs, setDocs] = useState<firebase.firestore.DocumentData[]>([]);
   const [boundary, setBoundary] = useState<firebase.firestore.DocumentData>();
@@ -31,33 +28,26 @@ const useReactivePagination: UseReactivePagination = ({
   const [listeners, setListeners] = useState<(() => void)[]>([]);
 
   const listen = async () => {
-    setSettingListener(true);
     const forwardOrderSnap = await forwardOrderQuery.limit(size).get();
 
     const _boundary = forwardOrderSnap.docs[forwardOrderSnap.docs.length - 1];
     if (!_boundary) {
-      setSettingListener(false);
       return;
     }
     setBoundary(_boundary);
 
     const listener = reverseOrderQuery.startAt(_boundary).onSnapshot(handleOnSnapshot, setError);
     setListeners((prev) => [...prev, listener]);
-
-    setSettingListener(false);
-    setInitialized(true);
   };
 
   const listenMore = async () => {
-    if (settingListener || !boundary) return;
-    setSettingListener(true);
+    if (!boundary) return;
 
     const forwardOrderSnap = await forwardOrderQuery.startAfter(boundary).limit(size).get();
 
     const prevBoundary = boundary;
     const _boundary = forwardOrderSnap.docs[forwardOrderSnap.docs.length - 1];
     if (!_boundary) {
-      setSettingListener(false);
       return;
     }
     setBoundary(_boundary);
@@ -67,8 +57,6 @@ const useReactivePagination: UseReactivePagination = ({
       .endBefore(prevBoundary)
       .onSnapshot(handleOnSnapshot, setError);
     setListeners((prev) => [...prev, listener]);
-
-    setSettingListener(false);
   };
 
   const detachListeners = () => {
@@ -106,11 +94,10 @@ const useReactivePagination: UseReactivePagination = ({
   }, [boundary]);
 
   return {
-    initialized,
     docs,
+    boundary,
     hasMore,
     error,
-    settingListener,
     listen,
     listenMore,
     detachListeners,
