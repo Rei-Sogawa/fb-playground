@@ -33,7 +33,7 @@ const useTodos = () => {
   }, [docs]);
 
   useEffect(() => {
-    // listen 実行タイミングで、query を満たすデータが firestore になかった場合
+    // listen 実行タイミングで、query を満たすデータが firestore になかった場合は全購読する
     if (calledListen && !boundary) {
       const listener = todosRef.orderBy("name", "asc").onSnapshot((snap) => {
         const _todos = snap.docs.map(
