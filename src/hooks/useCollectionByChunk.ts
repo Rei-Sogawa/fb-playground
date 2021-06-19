@@ -44,16 +44,10 @@ const useCollectionByChunk: UseCollectionByChunk = ({
     }
     setBoundary(_boundary);
 
-    const idx = 0;
-    const listener = reverseOrderQuery.startAt(_boundary).onSnapshot(
-      (snap) =>
-        setSnaps((prev) => {
-          prev[idx] = snap;
-          return prev;
-        }),
-      setError
-    );
-    setListeners((prev) => [...prev, listener]);
+    const listener = reverseOrderQuery
+      .startAt(_boundary)
+      .onSnapshot((snap) => setSnaps([snap]), setError);
+    setListeners([listener]);
 
     setSettingListener(false);
   };
