@@ -13,35 +13,29 @@ const todosRef = db.collection("todos");
 function App() {
   const [todos, setTodos] = useState<Todo[]>([]);
 
-  const { updating, hasMore, docSnaps, listen, listenMore, detachListeners } =
-    useReactivePagination({
-      forwardOrderQuery: todosRef.orderBy("name", "asc"),
-      reverseOrderQuery: todosRef.orderBy("name", "desc"),
-      size: 5,
-    });
+  const { hasMore, docs, listen, listenMore, detachListeners } = useReactivePagination({
+    forwardOrderQuery: todosRef.orderBy("name", "asc"),
+    reverseOrderQuery: todosRef.orderBy("name", "desc"),
+    size: 5,
+  });
 
   useMount(() => listen());
   useUnmount(() => detachListeners());
 
   useEffect(() => {
     const todos = sortBy(
-      docSnaps.map(
-        (docSnap) =>
+      docs.map(
+        (doc) =>
           ({
-            id: docSnap.id,
-            ref: docSnap.ref,
-            ...docSnap.data(),
+            id: doc.id,
+            ref: doc.ref,
+            ...doc.data(),
           } as Todo)
       ),
       "name"
     );
     setTodos(todos);
-  }, [docSnaps]);
-
-  const handleLoadMore = async () => {
-    if (updating) return;
-    await listenMore();
-  };
+  }, [docs]);
 
   const [name, setName] = useState("");
   const handleSubmit: React.FormEventHandler<HTMLFormElement> = async (e) => {
@@ -57,7 +51,7 @@ function App() {
         <input type="text" value={name} onChange={(e) => setName(e.target.value)} />
       </form>
 
-      <InfiniteScroll pageStart={0} loadMore={handleLoadMore} hasMore={hasMore}>
+      <InfiniteScroll pageStart={0} loadMore={listenMore} hasMore={hasMore}>
         <ul>
           {todos.map((todo) => (
             <li key={todo.id}>
