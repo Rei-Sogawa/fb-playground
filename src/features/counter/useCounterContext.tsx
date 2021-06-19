@@ -21,15 +21,12 @@ const CounterProvider = ({ children }: Props) => {
     decrement,
   };
 
-  return (
-    <CounterContext.Provider value={value}>{children}</CounterContext.Provider>
-  );
+  return <CounterContext.Provider value={value}>{children}</CounterContext.Provider>;
 };
 
 const useCounter = () => {
   const value = useContext(CounterContext);
-  if (!value)
-    throw new Error("useCounter must be used within a CounterProvider");
+  if (!value) throw new Error("useCounter must be used within a CounterProvider");
   return { ...value };
 };
 
