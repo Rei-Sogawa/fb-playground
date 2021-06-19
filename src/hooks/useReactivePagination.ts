@@ -36,7 +36,7 @@ const useReactivePagination: UseReactivePagination = ({
     }
     setBoundary(_boundary);
 
-    const listener = reverseOrderQuery.startAt(_boundary).onSnapshot(handleOnSnapshot, setError);
+    const listener = reverseOrderQuery.startAt(_boundary).onSnapshot(handleSnapshot, setError);
     setListeners((prev) => [...prev, listener]);
   };
 
@@ -55,7 +55,7 @@ const useReactivePagination: UseReactivePagination = ({
     const listener = reverseOrderQuery
       .startAt(_boundary)
       .endBefore(prevBoundary)
-      .onSnapshot(handleOnSnapshot, setError);
+      .onSnapshot(handleSnapshot, setError);
     setListeners((prev) => [...prev, listener]);
   };
 
@@ -64,7 +64,7 @@ const useReactivePagination: UseReactivePagination = ({
     setListeners([]);
   };
 
-  const handleOnSnapshot = (reverseOrderSnap: firebase.firestore.QuerySnapshot) => {
+  const handleSnapshot = (reverseOrderSnap: firebase.firestore.QuerySnapshot) => {
     reverseOrderSnap
       .docChanges()
       .reverse()
