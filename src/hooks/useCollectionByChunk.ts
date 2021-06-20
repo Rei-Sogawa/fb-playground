@@ -1,7 +1,7 @@
 import firebase from "firebase/app";
 import "firebase/firestore";
-import { useMemo } from "react";
-import { useEffect, useState, useReducer } from "react";
+import { useEffect, useMemo, useReducer, useState } from "react";
+import { useMount, useUnmount } from "react-use";
 
 type State = {
   snaps: firebase.firestore.QuerySnapshot[];
@@ -130,6 +130,7 @@ const useCollectionByChunk = ({
 }) => {
   const [state, dispatch] = useReducer(reducer, initialState);
   const { snaps, boundary, listeners, loading, loadingMore } = useMemo(() => state, [state]);
+  const docs = useMemo(() => snaps.map((snap) => snap.docs.reverse()).flat(), [snaps]);
 
   const [hasMore, setHasMore] = useState(false);
   const [error, setError] = useState<firebase.firestore.FirestoreError>();
@@ -207,16 +208,15 @@ const useCollectionByChunk = ({
   };
   const detachListeners = () => dispatch({ type: "DETACH_LISTENERS" });
 
-  const docs = useMemo(() => snaps.map((snap) => snap.docs.reverse()).flat(), [snaps]);
+  useMount(() => listen());
+  useUnmount(() => detachListeners());
 
   return {
     docs,
     boundary,
     hasMore,
     error,
-    listen,
     listenMore,
-    detachListeners,
   };
 };
 
