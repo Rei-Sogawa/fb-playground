@@ -56,7 +56,11 @@ const initialState: State = {
 const reducer = (state: State, action: Action): State => {
   switch (action.type) {
     case "LISTEN": {
-      return { ...state, loading: true };
+      if (state.loading) {
+        return state;
+      } else {
+        return { ...state, loading: true };
+      }
     }
     case "FINISH_LISTEN": {
       if (action.payload) {
@@ -78,7 +82,11 @@ const reducer = (state: State, action: Action): State => {
       }
     }
     case "LISTEN_MORE": {
-      return { ...state, loadingMore: true };
+      if (state.loading || state.loadingMore || state.snaps.length !== state.listeners.length) {
+        return state;
+      } else {
+        return { ...state, loadingMore: true };
+      }
     }
     case "FINISH_LISTEN_MORE": {
       if (action.payload) {
@@ -129,7 +137,7 @@ const useCollectionByChunk = ({
   size: number;
 }) => {
   const [state, dispatch] = useReducer(reducer, initialState);
-  const { snaps, boundary, listeners, loading, loadingMore } = useMemo(() => state, [state]);
+  const { snaps, boundary, loading, loadingMore } = useMemo(() => state, [state]);
   const docs = useMemo(() => snaps.map((snap) => snap.docs.reverse()).flat(), [snaps]);
 
   const [hasMore, setHasMore] = useState(false);
@@ -198,24 +206,15 @@ const useCollectionByChunk = ({
         .onSnapshot((snap) => setHasMore(snap.docs.length === 1));
     } else {
       return forwardOrderQuery.limit(1).onSnapshot((snap) => {
-        if (snap.docs.length === 1) listen();
+        if (snap.docs.length === 1) dispatch({ type: "LISTEN" });
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [boundary]);
 
-  const listen = () => {
-    if (loading) return;
-    dispatch({ type: "LISTEN" });
-  };
-  const listenMore = () => {
-    if (loading || loadingMore) return;
-    if (snaps.length !== listeners.length) return;
-    dispatch({ type: "LISTEN_MORE" });
-  };
-  const detachListeners = () => dispatch({ type: "DETACH_LISTENERS" });
+  useUnmount(() => dispatch({ type: "DETACH_LISTENERS" }));
 
-  useUnmount(() => detachListeners());
+  const listenMore = () => dispatch({ type: "LISTEN_MORE" });
 
   return {
     docs,
