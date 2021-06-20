@@ -34,6 +34,9 @@ const useCollectionByChunk: UseCollectionByChunk = ({
   const [error, setError] = useState<firebase.firestore.FirestoreError>();
 
   const listen = async () => {
+    if (snaps.length !== listeners.length) return;
+    if (settingListener) return;
+
     setSettingListener(true);
 
     const forwardOrderSnap = await forwardOrderQuery.limit(size).get();
@@ -44,15 +47,20 @@ const useCollectionByChunk: UseCollectionByChunk = ({
     }
     setBoundary(_boundary);
 
+    const idx = 0;
     const listener = reverseOrderQuery
       .startAt(_boundary)
-      .onSnapshot((snap) => setSnaps([snap]), setError);
-    setListeners([listener]);
+      .onSnapshot((snap) => setSnaps((prev) => [snap, ...prev.slice(1)]), setError);
+    setListeners((prev) => {
+      if (prev[idx]) prev[idx]();
+      return [...prev.slice(0, idx), listener, ...prev.slice(idx + 1)];
+    });
 
     setSettingListener(false);
   };
 
   const listenMore = async () => {
+    if (snaps.length !== listeners.length) return;
     if (settingListener || !boundary) return;
 
     setSettingListener(true);
@@ -71,14 +79,13 @@ const useCollectionByChunk: UseCollectionByChunk = ({
       .startAt(_boundary)
       .endBefore(prevBoundary)
       .onSnapshot(
-        (snap) =>
-          setSnaps((prev) => {
-            prev[idx] = snap;
-            return prev;
-          }),
+        (snap) => setSnaps((prev) => [...prev.slice(0, idx), snap, ...prev.slice(idx + 1)]),
         setError
       );
-    setListeners((prev) => [...prev, listener]);
+    setListeners((prev) => {
+      if (prev[idx]) prev[idx]();
+      return [...prev.slice(0, idx), listener, ...prev.slice(idx + 1)];
+    });
 
     setSettingListener(false);
   };
@@ -101,7 +108,7 @@ const useCollectionByChunk: UseCollectionByChunk = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [boundary]);
 
-  const docs = useMemo(() => snaps.map((snap) => snap.docs).flat(), [snaps]);
+  const docs = useMemo(() => snaps.map((snap) => snap.docs.reverse()).flat(), [snaps]);
 
   return {
     docs,
