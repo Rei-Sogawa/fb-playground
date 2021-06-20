@@ -8,7 +8,7 @@ const todosRef = db.collection("todos");
 
 const useTodos = () => {
   const [todos, setTodos] = useState<Todo[]>([]);
-  const { docs, boundary, hasMore, listenMore } = useCollectionByChunk({
+  const { docs, hasMore, listenMore } = useCollectionByChunk({
     forwardOrderQuery: todosRef.orderBy("name", "asc"),
     reverseOrderQuery: todosRef.orderBy("name", "desc"),
     size: 5,

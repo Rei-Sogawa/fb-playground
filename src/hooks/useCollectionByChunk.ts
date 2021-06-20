@@ -1,7 +1,7 @@
 import firebase from "firebase/app";
 import "firebase/firestore";
 import { useEffect, useMemo, useReducer, useState } from "react";
-import { useMount, useUnmount } from "react-use";
+import { useUnmount } from "react-use";
 
 type State = {
   snaps: firebase.firestore.QuerySnapshot[];
@@ -196,11 +196,18 @@ const useCollectionByChunk = ({
         .startAfter(boundary)
         .limit(1)
         .onSnapshot((snap) => setHasMore(snap.docs.length === 1));
+    } else {
+      return forwardOrderQuery.limit(1).onSnapshot((snap) => {
+        if (snap.docs.length === 1) listen();
+      });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [boundary]);
 
-  const listen = () => dispatch({ type: "LISTEN" });
+  const listen = () => {
+    if (loading) return;
+    dispatch({ type: "LISTEN" });
+  };
   const listenMore = () => {
     if (loading || loadingMore) return;
     if (snaps.length !== listeners.length) return;
@@ -208,7 +215,6 @@ const useCollectionByChunk = ({
   };
   const detachListeners = () => dispatch({ type: "DETACH_LISTENERS" });
 
-  useMount(() => listen());
   useUnmount(() => detachListeners());
 
   return {
