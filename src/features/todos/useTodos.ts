@@ -9,15 +9,17 @@ const todosRef = db.collection("todos");
 
 const useTodos = () => {
   const [todos, setTodos] = useState<Todo[]>([]);
-  const [calledListen, setCalledListen] = useState(false);
-
   const { docs, boundary, hasMore, listen, listenMore, detachListeners } = useCollectionByChunk({
     forwardOrderQuery: todosRef.orderBy("name", "asc"),
     reverseOrderQuery: todosRef.orderBy("name", "desc"),
     size: 5,
   });
+  const [calledListen, setCalledListen] = useState(false);
 
-  useMount(() => listen().then(() => setCalledListen(true)));
+  useMount(() => {
+    listen();
+    setCalledListen(true);
+  });
   useUnmount(() => detachListeners());
 
   useEffect(() => {
@@ -26,17 +28,9 @@ const useTodos = () => {
   }, [docs]);
 
   useEffect(() => {
-    // listen 実行タイミングで、query を満たすデータが firestore になかった場合は全購読する
-    if (calledListen && !boundary) {
-      const listener = todosRef.orderBy("name", "asc").onSnapshot((snap) => {
-        const _todos = snap.docs.map(
-          (doc) => ({ id: doc.id, ref: doc.ref, ...doc.data() } as Todo)
-        );
-        setTodos(_todos);
-      });
-      return listener;
-    }
-  }, [calledListen, boundary]);
+    console.log(boundary);
+    console.log(calledListen);
+  }, [boundary, calledListen]);
 
   return {
     todos,
