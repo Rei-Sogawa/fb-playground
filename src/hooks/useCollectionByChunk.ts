@@ -7,16 +7,16 @@ type State = {
   snaps: firebase.firestore.QuerySnapshot[];
   boundary?: firebase.firestore.DocumentData;
   listeners: (() => void)[];
-  loading: boolean;
-  loadingMore: boolean;
+  subscribing: boolean;
+  subscribingMore: boolean;
 };
 
 type Action =
   | {
-      type: "LISTEN";
+      type: "SUBSCRIBE";
     }
   | {
-      type: "FINISH_LISTEN";
+      type: "SUBSCRIBED";
       payload?: {
         boundary: firebase.firestore.DocumentData;
         idx: number;
@@ -24,10 +24,10 @@ type Action =
       };
     }
   | {
-      type: "LISTEN_MORE";
+      type: "SUBSCRIBE_MORE";
     }
   | {
-      type: "FINISH_LISTEN_MORE";
+      type: "SUBSCRIBED_MORE";
       payload?: {
         boundary: firebase.firestore.DocumentData;
         idx: number;
@@ -49,20 +49,20 @@ const initialState: State = {
   snaps: [],
   boundary: undefined,
   listeners: [],
-  loading: false,
-  loadingMore: false,
+  subscribing: false,
+  subscribingMore: false,
 };
 
 const reducer = (state: State, action: Action): State => {
   switch (action.type) {
-    case "LISTEN": {
-      if (state.loading) {
+    case "SUBSCRIBE": {
+      if (state.subscribing) {
         return state;
       } else {
-        return { ...state, loading: true };
+        return { ...state, subscribing: true };
       }
     }
-    case "FINISH_LISTEN": {
+    case "SUBSCRIBED": {
       if (action.payload) {
         const { boundary, idx, listener } = action.payload;
         const prevListener = state.listeners[idx];
@@ -75,20 +75,24 @@ const reducer = (state: State, action: Action): State => {
             listener,
             ...state.listeners.slice(idx + 1),
           ],
-          loading: false,
+          subscribing: false,
         };
       } else {
-        return { ...state, loading: false };
+        return { ...state, subscribing: false };
       }
     }
-    case "LISTEN_MORE": {
-      if (state.loading || state.loadingMore || state.snaps.length !== state.listeners.length) {
+    case "SUBSCRIBE_MORE": {
+      if (
+        state.subscribing ||
+        state.subscribingMore ||
+        state.snaps.length !== state.listeners.length
+      ) {
         return state;
       } else {
-        return { ...state, loadingMore: true };
+        return { ...state, subscribingMore: true };
       }
     }
-    case "FINISH_LISTEN_MORE": {
+    case "SUBSCRIBED_MORE": {
       if (action.payload) {
         const { boundary, idx, listener } = action.payload;
         const prevListener = state.listeners[idx];
@@ -101,10 +105,10 @@ const reducer = (state: State, action: Action): State => {
             listener,
             ...state.listeners.slice(idx + 1),
           ],
-          loadingMore: false,
+          subscribingMore: false,
         };
       } else {
-        return { ...state, loadingMore: false };
+        return { ...state, subscribingMore: false };
       }
     }
     case "UPDATE_SNAP": {
@@ -137,19 +141,19 @@ const useCollectionByChunk = ({
   size: number;
 }) => {
   const [state, dispatch] = useReducer(reducer, initialState);
-  const { snaps, boundary, loading, loadingMore } = useMemo(() => state, [state]);
+  const { snaps, boundary, subscribing, subscribingMore } = useMemo(() => state, [state]);
   const docs = useMemo(() => snaps.map((snap) => snap.docs.reverse()).flat(), [snaps]);
 
   const [hasMore, setHasMore] = useState(false);
   const [error, setError] = useState<firebase.firestore.FirestoreError>();
 
   useEffect(() => {
-    if (loading) {
+    if (subscribing) {
       const effect = async () => {
         const forwardOrderSnap = await forwardOrderQuery.limit(size).get();
         const _boundary = forwardOrderSnap.docs[forwardOrderSnap.docs.length - 1];
         if (!_boundary) {
-          dispatch({ type: "FINISH_LISTEN" });
+          dispatch({ type: "SUBSCRIBED" });
           return;
         }
         const idx = 0;
@@ -159,21 +163,21 @@ const useCollectionByChunk = ({
             (snap) => dispatch({ type: "UPDATE_SNAP", payload: { idx, snap } }),
             setError
           );
-        dispatch({ type: "FINISH_LISTEN", payload: { boundary: _boundary, idx, listener } });
+        dispatch({ type: "SUBSCRIBED", payload: { boundary: _boundary, idx, listener } });
       };
       effect();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loading]);
+  }, [subscribing]);
 
   useEffect(() => {
-    if (loadingMore) {
+    if (subscribingMore) {
       const effect = async () => {
         const forwardOrderSnap = await forwardOrderQuery.startAfter(boundary).limit(size).get();
         const prevBoundary = boundary;
         const _boundary = forwardOrderSnap.docs[forwardOrderSnap.docs.length - 1];
         if (!_boundary) {
-          dispatch({ type: "FINISH_LISTEN_MORE" });
+          dispatch({ type: "SUBSCRIBED_MORE" });
           return;
         }
         const idx = snaps.length;
@@ -185,7 +189,7 @@ const useCollectionByChunk = ({
             setError
           );
         dispatch({
-          type: "FINISH_LISTEN_MORE",
+          type: "SUBSCRIBED_MORE",
           payload: {
             boundary: _boundary,
             idx,
@@ -196,7 +200,7 @@ const useCollectionByChunk = ({
       effect();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loadingMore]);
+  }, [subscribingMore]);
 
   useEffect(() => {
     if (boundary) {
@@ -206,7 +210,7 @@ const useCollectionByChunk = ({
         .onSnapshot((snap) => setHasMore(snap.docs.length === 1));
     } else {
       return forwardOrderQuery.limit(1).onSnapshot((snap) => {
-        if (snap.docs.length === 1) dispatch({ type: "LISTEN" });
+        if (snap.docs.length === 1) dispatch({ type: "SUBSCRIBE" });
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -214,14 +218,14 @@ const useCollectionByChunk = ({
 
   useUnmount(() => dispatch({ type: "DETACH_LISTENERS" }));
 
-  const listenMore = () => dispatch({ type: "LISTEN_MORE" });
+  const subscribeMore = () => dispatch({ type: "SUBSCRIBE_MORE" });
 
   return {
     docs,
     boundary,
     hasMore,
     error,
-    listenMore,
+    subscribeMore,
   };
 };
 
