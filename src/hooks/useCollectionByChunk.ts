@@ -2,6 +2,7 @@ import firebase from "firebase/app";
 import "firebase/firestore";
 import { useEffect, useMemo, useReducer, useState } from "react";
 import { useUnmount } from "react-use";
+import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 
 type State = {
   snaps: firebase.firestore.QuerySnapshot[];
@@ -11,40 +12,6 @@ type State = {
   subscribingMore: boolean;
 };
 
-type Action =
-  | {
-      type: "SUBSCRIBE";
-    }
-  | {
-      type: "SUBSCRIBED";
-      payload?: {
-        boundary: firebase.firestore.DocumentData;
-        idx: number;
-        listener: () => void;
-      };
-    }
-  | {
-      type: "SUBSCRIBE_MORE";
-    }
-  | {
-      type: "SUBSCRIBED_MORE";
-      payload?: {
-        boundary: firebase.firestore.DocumentData;
-        idx: number;
-        listener: () => void;
-      };
-    }
-  | {
-      type: "UPDATE_SNAP";
-      payload: {
-        idx: number;
-        snap: firebase.firestore.QuerySnapshot;
-      };
-    }
-  | {
-      type: "DETACH_LISTENERS";
-    };
-
 const initialState: State = {
   snaps: [],
   boundary: undefined,
@@ -53,83 +20,88 @@ const initialState: State = {
   subscribingMore: false,
 };
 
-const reducer = (state: State, action: Action): State => {
-  switch (action.type) {
-    case "SUBSCRIBE": {
-      if (state.subscribing) {
-        return state;
-      } else {
-        return { ...state, subscribing: true };
+const collectionByChunk = createSlice({
+  name: "collectionByChunk",
+  initialState,
+  reducers: {
+    subscribe: (state) => {
+      if (!state.subscribing) {
+        state.subscribing = true;
       }
-    }
-    case "SUBSCRIBED": {
+    },
+    subscribed: (
+      state,
+      action: PayloadAction<
+        | {
+            boundary: firebase.firestore.DocumentData;
+            idx: number;
+            listener: () => void;
+          }
+        | undefined
+      >
+    ) => {
       if (action.payload) {
         const { boundary, idx, listener } = action.payload;
-        const prevListener = state.listeners[idx];
-        if (prevListener) prevListener();
-        return {
-          ...state,
-          boundary,
-          listeners: [
-            ...state.listeners.slice(0, idx),
-            listener,
-            ...state.listeners.slice(idx + 1),
-          ],
-          subscribing: false,
-        };
-      } else {
-        return { ...state, subscribing: false };
+        if (state.listeners[idx]) state.listeners[idx]();
+        state.boundary = boundary;
+        state.listeners[idx] = listener;
       }
-    }
-    case "SUBSCRIBE_MORE": {
+      state.subscribing = false;
+    },
+    subscribeMore: (state) => {
       if (
-        state.subscribing ||
-        state.subscribingMore ||
-        state.snaps.length !== state.listeners.length
+        !state.subscribing &&
+        !state.subscribingMore &&
+        state.snaps.length === state.listeners.length
       ) {
-        return state;
-      } else {
-        return { ...state, subscribingMore: true };
+        state.subscribingMore = true;
       }
-    }
-    case "SUBSCRIBED_MORE": {
+    },
+    subscribedMore: (
+      state,
+      action: PayloadAction<
+        | {
+            boundary: firebase.firestore.DocumentData;
+            idx: number;
+            listener: () => void;
+          }
+        | undefined
+      >
+    ) => {
       if (action.payload) {
         const { boundary, idx, listener } = action.payload;
-        const prevListener = state.listeners[idx];
-        if (prevListener) prevListener();
-        return {
-          ...state,
-          boundary,
-          listeners: [
-            ...state.listeners.slice(0, idx),
-            listener,
-            ...state.listeners.slice(idx + 1),
-          ],
-          subscribingMore: false,
-        };
-      } else {
-        return { ...state, subscribingMore: false };
+        if (state.listeners[idx]) state.listeners[idx]();
+        state.boundary = boundary;
+        state.listeners[idx] = listener;
       }
-    }
-    case "UPDATE_SNAP": {
+      state.subscribingMore = false;
+    },
+    updateSnap: (
+      state,
+      action: PayloadAction<{ idx: number; snap: firebase.firestore.QuerySnapshot }>
+    ) => {
       const { idx, snap } = action.payload;
-      return {
-        ...state,
-        snaps: [...state.snaps.slice(0, idx), snap, ...state.snaps.slice(idx + 1)],
-      };
-    }
-    case "DETACH_LISTENERS": {
+      state.snaps[idx] = snap;
+    },
+    detachListeners: (state) => {
       state.listeners.forEach((listener) => listener());
-      return {
-        ...state,
-        listeners: [],
-      };
-    }
-    default: {
-      return state;
-    }
-  }
-};
+      state.listeners = [];
+    },
+    resetState: (state) => {
+      state = initialState;
+    },
+  },
+});
+
+const {
+  subscribe,
+  subscribed,
+  subscribeMore,
+  subscribedMore,
+  updateSnap,
+  detachListeners,
+  resetState,
+} = collectionByChunk.actions;
 
 const useCollectionByChunk = ({
   forwardOrderQuery,
@@ -140,7 +112,7 @@ const useCollectionByChunk = ({
   reverseOrderQuery: firebase.firestore.Query;
   size: number;
 }) => {
-  const [state, dispatch] = useReducer(reducer, initialState);
+  const [state, dispatch] = useReducer(collectionByChunk.reducer, initialState);
   const { snaps, boundary, subscribing, subscribingMore } = useMemo(() => state, [state]);
   const docs = useMemo(() => snaps.map((snap) => snap.docs.reverse()).flat(), [snaps]);
 
@@ -148,22 +120,23 @@ const useCollectionByChunk = ({
   const [error, setError] = useState<firebase.firestore.FirestoreError>();
 
   useEffect(() => {
+    console.log("hey");
+  }, [forwardOrderQuery, reverseOrderQuery]);
+
+  useEffect(() => {
     if (subscribing) {
       const effect = async () => {
         const forwardOrderSnap = await forwardOrderQuery.limit(size).get();
         const _boundary = forwardOrderSnap.docs[forwardOrderSnap.docs.length - 1];
         if (!_boundary) {
-          dispatch({ type: "SUBSCRIBED" });
+          dispatch(subscribed());
           return;
         }
         const idx = 0;
         const listener = reverseOrderQuery
           .startAt(_boundary)
-          .onSnapshot(
-            (snap) => dispatch({ type: "UPDATE_SNAP", payload: { idx, snap } }),
-            setError
-          );
-        dispatch({ type: "SUBSCRIBED", payload: { boundary: _boundary, idx, listener } });
+          .onSnapshot((snap) => dispatch(updateSnap({ idx, snap })), setError);
+        dispatch(subscribed({ boundary: _boundary, idx, listener }));
       };
       effect();
     }
@@ -177,25 +150,15 @@ const useCollectionByChunk = ({
         const prevBoundary = boundary;
         const _boundary = forwardOrderSnap.docs[forwardOrderSnap.docs.length - 1];
         if (!_boundary) {
-          dispatch({ type: "SUBSCRIBED_MORE" });
+          dispatch(subscribedMore());
           return;
         }
         const idx = snaps.length;
         const listener = reverseOrderQuery
           .startAt(_boundary)
           .endBefore(prevBoundary)
-          .onSnapshot(
-            (snap) => dispatch({ type: "UPDATE_SNAP", payload: { idx, snap } }),
-            setError
-          );
-        dispatch({
-          type: "SUBSCRIBED_MORE",
-          payload: {
-            boundary: _boundary,
-            idx,
-            listener,
-          },
-        });
+          .onSnapshot((snap) => dispatch(updateSnap({ idx, snap })), setError);
+        dispatch(subscribedMore({ boundary: _boundary, idx, listener }));
       };
       effect();
     }
@@ -210,22 +173,22 @@ const useCollectionByChunk = ({
         .onSnapshot((snap) => setHasMore(snap.docs.length === 1));
     } else {
       return forwardOrderQuery.limit(1).onSnapshot((snap) => {
-        if (snap.docs.length === 1) dispatch({ type: "SUBSCRIBE" });
+        if (snap.docs.length === 1) dispatch(subscribe());
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [boundary]);
 
-  useUnmount(() => dispatch({ type: "DETACH_LISTENERS" }));
-
-  const subscribeMore = () => dispatch({ type: "SUBSCRIBE_MORE" });
+  useUnmount(() => dispatch(detachListeners()));
 
   return {
     docs,
     boundary,
     hasMore,
     error,
-    subscribeMore,
+    subscribeMore: () => dispatch(subscribeMore()),
+    detachListeners: () => dispatch(detachListeners()),
+    resetState: () => dispatch(resetState()),
   };
 };
 

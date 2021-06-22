@@ -5,12 +5,14 @@ import { Todo } from "../../models";
 import useCollectionByChunk from "../../hooks/useCollectionByChunk";
 
 const todosRef = db.collection("todos");
+const forwardOrderQuery = todosRef.orderBy("name", "asc");
+const reverseOrderQuery = todosRef.orderBy("name", "desc");
 
 const useTodos = () => {
   const [todos, setTodos] = useState<Todo[]>([]);
   const { docs, hasMore, subscribeMore } = useCollectionByChunk({
-    forwardOrderQuery: todosRef.orderBy("name", "asc"),
-    reverseOrderQuery: todosRef.orderBy("name", "desc"),
+    forwardOrderQuery,
+    reverseOrderQuery,
     size: 5,
   });
 
