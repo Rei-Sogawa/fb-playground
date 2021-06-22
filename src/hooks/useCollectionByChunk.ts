@@ -1,3 +1,5 @@
+/* eslint-disable react-hooks/exhaustive-deps */
+
 import firebase from "firebase/app";
 import "firebase/firestore";
 import { useEffect, useMemo, useReducer, useState } from "react";
@@ -87,41 +89,27 @@ const collectionByChunk = createSlice({
       state.listeners.forEach((listener) => listener());
       state.listeners = [];
     },
-    resetState: (state) => {
-      state = initialState;
-    },
   },
 });
 
-const {
-  subscribe,
-  subscribed,
-  subscribeMore,
-  subscribedMore,
-  updateSnap,
-  detachListeners,
-  resetState,
-} = collectionByChunk.actions;
+const { subscribe, subscribed, subscribeMore, subscribedMore, updateSnap, detachListeners } =
+  collectionByChunk.actions;
 
-const useCollectionByChunk = ({
-  forwardOrderQuery,
-  reverseOrderQuery,
-  size,
-}: {
+const useCollectionByChunk = (options: {
   forwardOrderQuery: firebase.firestore.Query;
   reverseOrderQuery: firebase.firestore.Query;
   size: number;
 }) => {
+  const forwardOrderQuery = useMemo(() => options.forwardOrderQuery, []);
+  const reverseOrderQuery = useMemo(() => options.reverseOrderQuery, []);
+  const size = useMemo(() => options.size, []);
+
   const [state, dispatch] = useReducer(collectionByChunk.reducer, initialState);
   const { snaps, boundary, subscribing, subscribingMore } = useMemo(() => state, [state]);
   const docs = useMemo(() => snaps.map((snap) => snap.docs.reverse()).flat(), [snaps]);
 
   const [hasMore, setHasMore] = useState(false);
   const [error, setError] = useState<firebase.firestore.FirestoreError>();
-
-  useEffect(() => {
-    console.log("hey");
-  }, [forwardOrderQuery, reverseOrderQuery]);
 
   useEffect(() => {
     if (subscribing) {
@@ -140,7 +128,6 @@ const useCollectionByChunk = ({
       };
       effect();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [subscribing]);
 
   useEffect(() => {
@@ -162,7 +149,6 @@ const useCollectionByChunk = ({
       };
       effect();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [subscribingMore]);
 
   useEffect(() => {
@@ -176,7 +162,6 @@ const useCollectionByChunk = ({
         if (snap.docs.length === 1) dispatch(subscribe());
       });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [boundary]);
 
   useUnmount(() => dispatch(detachListeners()));
@@ -187,8 +172,6 @@ const useCollectionByChunk = ({
     hasMore,
     error,
     subscribeMore: () => dispatch(subscribeMore()),
-    detachListeners: () => dispatch(detachListeners()),
-    resetState: () => dispatch(resetState()),
   };
 };
 
