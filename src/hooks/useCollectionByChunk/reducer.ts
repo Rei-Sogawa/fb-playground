@@ -98,11 +98,11 @@ const reducer = (draft: State, action: Action): State | void => {
 export default produce(reducer);
 
 const subscribe = async (dispatch: Dispatch<Action>, state: State) => {
-  const { subscribing } = state;
+  const { forwardOrderQuery, reverseOrderQuery, size, snaps, listeners, subscribing } = state;
   if (subscribing) return;
+  if (snaps.length !== 0 || listeners.length !== 0) return;
 
   dispatch({ type: "startSubscribe" });
-  const { forwardOrderQuery, reverseOrderQuery, size } = state;
   const forwardOrderSnap = await forwardOrderQuery.limit(size).get();
   const boundary = forwardOrderSnap.docs[forwardOrderSnap.docs.length - 1];
   if (!boundary) {
@@ -120,15 +120,13 @@ const subscribe = async (dispatch: Dispatch<Action>, state: State) => {
 };
 
 const subscribeMore = async (dispatch: Dispatch<Action>, state: State) => {
-  const { subscribing } = state;
+  const { forwardOrderQuery, reverseOrderQuery, size, snaps, boundary, listeners, subscribing } =
+    state;
   if (subscribing) return;
+  if (!boundary) return;
+  if (snaps.length === 0 || listeners.length === 0 || snaps.length !== listeners.length) return;
 
   dispatch({ type: "startSubscribe" });
-  const { forwardOrderQuery, reverseOrderQuery, size, snaps, boundary } = state;
-  if (!boundary) {
-    dispatch({ type: "finishSubscribe" });
-    return;
-  }
   const forwardOrderSnap = await forwardOrderQuery.startAfter(boundary).limit(size).get();
   const newBoundary = forwardOrderSnap.docs[forwardOrderSnap.docs.length - 1];
   if (!newBoundary) {

@@ -18,6 +18,7 @@ const useCollectionByChunk = ({
 
   const subscribe = () => asyncAction.subscribe(dispatch, state);
   const subscribeMore = () => asyncAction.subscribeMore(dispatch, state);
+
   const reset = ({
     forwardOrderQuery,
     reverseOrderQuery,
