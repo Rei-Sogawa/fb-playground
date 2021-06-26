@@ -150,3 +150,9 @@ export const asyncAction = {
   subscribe,
   subscribeMore,
 };
+
+const docs = (snaps: State["snaps"]) => snaps.map((snap) => snap.docs.reverse()).flat();
+
+export const selector = {
+  docs,
+};

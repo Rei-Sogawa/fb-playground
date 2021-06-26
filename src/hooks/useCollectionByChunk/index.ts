@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo, useReducer } from "react";
 
-import reducer, { initializer, asyncAction, State } from "./reducer";
+import reducer, { initializer, asyncAction, selector, State } from "./reducer";
 
 const useCollectionByChunk = ({
   forwardOrderQuery,
@@ -26,7 +26,7 @@ const useCollectionByChunk = ({
     dispatch({ type: "initialize", payload: { forwardOrderQuery, reverseOrderQuery, size } });
   };
 
-  const docs = useMemo(() => state.snaps.map((snap) => snap.docs.reverse()).flat(), [state.snaps]);
+  const docs = useMemo(() => selector.docs(state.snaps), [state.snaps]);
 
   useEffect(() => {
     if (state.boundary) {
