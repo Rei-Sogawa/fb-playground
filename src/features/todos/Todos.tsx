@@ -7,10 +7,11 @@ import TodoEditForm from "./TodoEditForm";
 import useTodos from "./useTodos";
 
 const Todos = () => {
-  const { todos, hasMore, listenMore } = useTodos();
+  const { todos, hasMore, listenMore, reset } = useTodos();
   const scrollParentRef = useRef(null);
   return (
     <div>
+      <button onClick={reset}>reset</button>
       <TodoNewForm />
       <br />
       <div
