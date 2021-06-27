@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useReducer } from "react";
+import { useCallback, useEffect, useMemo, useReducer } from "react";
 
 import reducer, { initializer, action, selector, State } from "./reducer";
 
@@ -13,8 +13,9 @@ const useCollectionByChunk = ({
     initializer
   );
 
-  const subscribe = () => action.subscribe(dispatch, state);
-  const subscribeMore = () => action.subscribeMore(dispatch, state);
+  const docs = useMemo(() => selector.docs(state.snaps), [state.snaps]);
+
+  const subscribeMore = useCallback(() => action.subscribeMore(dispatch, state), [dispatch, state]);
 
   const reset = ({
     forwardOrderQuery,
@@ -24,8 +25,6 @@ const useCollectionByChunk = ({
     dispatch({ type: "detachListeners" });
     dispatch({ type: "initialize", payload: { forwardOrderQuery, reverseOrderQuery, size } });
   };
-
-  const docs = useMemo(() => selector.docs(state.snaps), [state.snaps]);
 
   useEffect(() => {
     if (state.boundary) {
@@ -44,10 +43,9 @@ const useCollectionByChunk = ({
 
   return {
     docs,
-    subscribe,
-    subscribeMore,
     hasMore: state.hasMore,
     error: state.error,
+    subscribeMore,
     reset,
   };
 };
