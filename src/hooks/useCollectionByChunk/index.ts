@@ -1,6 +1,6 @@
-import { useEffect, useState, useMemo, useReducer } from "react";
+import { useEffect, useMemo, useReducer } from "react";
 
-import reducer, { initializer, asyncAction, selector, State } from "./reducer";
+import reducer, { initializer, action, selector, State } from "./reducer";
 
 const useCollectionByChunk = ({
   forwardOrderQuery,
@@ -12,10 +12,9 @@ const useCollectionByChunk = ({
     { forwardOrderQuery, reverseOrderQuery, size },
     initializer
   );
-  const [hasMore, setHasMore] = useState(false);
 
-  const subscribe = () => asyncAction.subscribe(dispatch, state);
-  const subscribeMore = () => asyncAction.subscribeMore(dispatch, state);
+  const subscribe = () => action.subscribe(dispatch, state);
+  const subscribeMore = () => action.subscribeMore(dispatch, state);
 
   const reset = ({
     forwardOrderQuery,
@@ -30,14 +29,11 @@ const useCollectionByChunk = ({
 
   useEffect(() => {
     if (state.boundary) {
-      return state.forwardOrderQuery
-        .startAfter(state.boundary)
-        .limit(1)
-        .onSnapshot((snap) => setHasMore(snap.docs.length === 1));
+      const listener = action.watchNextDoc(dispatch, state);
+      return () => listener();
     } else {
-      return state.forwardOrderQuery.limit(1).onSnapshot((snap) => {
-        if (snap.docs.length === 1) subscribe();
-      });
+      const listener = action.watchFirstDoc(dispatch, state);
+      return () => listener();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.boundary]);
@@ -50,7 +46,7 @@ const useCollectionByChunk = ({
     docs,
     subscribe,
     subscribeMore,
-    hasMore,
+    hasMore: state.hasMore,
     error: state.error,
     reset,
   };

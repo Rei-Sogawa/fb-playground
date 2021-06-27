@@ -12,6 +12,7 @@ export type State = {
   listeners: (() => void)[];
   subscribing: boolean;
   error?: firebase.firestore.FirestoreError;
+  hasMore: boolean;
 };
 
 type Action =
@@ -39,6 +40,10 @@ type Action =
   | {
       type: "initialize";
       payload: Pick<State, "forwardOrderQuery" | "reverseOrderQuery" | "size">;
+    }
+  | {
+      type: "updateHasMore";
+      payload: { hasMore: boolean };
     };
 
 export const initializer = ({
@@ -54,6 +59,7 @@ export const initializer = ({
   listeners: [],
   subscribing: false,
   error: undefined,
+  hasMore: false,
 });
 
 const reducer = (draft: State, action: Action): State | void => {
@@ -146,9 +152,28 @@ const subscribeMore = async (dispatch: Dispatch<Action>, state: State) => {
   dispatch({ type: "finishSubscribe" });
 };
 
-export const asyncAction = {
+const watchNextDoc = (dispatch: Dispatch<Action>, state: State) => {
+  return state.forwardOrderQuery
+    .startAfter(state.boundary)
+    .limit(1)
+    .onSnapshot(
+      (snap) => dispatch({ type: "updateHasMore", payload: { hasMore: snap.docs.length === 1 } }),
+      (error) => dispatch({ type: "catchError", payload: { error } })
+    );
+};
+
+const watchFirstDoc = (dispatch: Dispatch<Action>, state: State) => {
+  return state.forwardOrderQuery.limit(1).onSnapshot(
+    (snap) => snap.docs.length === 1 && subscribe(dispatch, state),
+    (error) => dispatch({ type: "catchError", payload: { error } })
+  );
+};
+
+export const action = {
   subscribe,
   subscribeMore,
+  watchNextDoc,
+  watchFirstDoc,
 };
 
 const docs = (snaps: State["snaps"]) => snaps.map((snap) => snap.docs.reverse()).flat();
