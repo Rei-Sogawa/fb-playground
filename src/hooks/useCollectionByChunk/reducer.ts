@@ -95,6 +95,10 @@ const reducer = (draft: State, action: Action): State | void => {
     case "initialize": {
       return initializer(action.payload);
     }
+    case "updateHasMore": {
+      draft.hasMore = action.payload.hasMore;
+      return;
+    }
     default: {
       return;
     }
