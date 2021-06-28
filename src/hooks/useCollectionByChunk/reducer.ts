@@ -10,9 +10,9 @@ export type State = {
   snaps: firebase.firestore.QuerySnapshot[];
   boundary?: firebase.firestore.DocumentData;
   listeners: (() => void)[];
+  hasMore: boolean;
   subscribing: boolean;
   error?: firebase.firestore.FirestoreError;
-  hasMore: boolean;
 };
 
 type Action =
