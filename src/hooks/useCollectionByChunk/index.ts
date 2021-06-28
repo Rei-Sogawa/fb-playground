@@ -13,18 +13,19 @@ const useCollectionByChunk = ({
     initializer
   );
 
-  const docs = useMemo(() => selector.docs(state.snaps), [state.snaps]);
+  const docs = useMemo(() => selector.docs(state), [state]);
 
   const subscribeMore = useCallback(() => action.subscribeMore(dispatch, state), [dispatch, state]);
 
-  const reset = ({
-    forwardOrderQuery,
-    reverseOrderQuery,
-    size,
-  }: Pick<State, "forwardOrderQuery" | "reverseOrderQuery" | "size">) => {
-    dispatch({ type: "detachListeners" });
-    dispatch({ type: "initialize", payload: { forwardOrderQuery, reverseOrderQuery, size } });
-  };
+  const reset = useCallback(
+    ({
+      forwardOrderQuery,
+      reverseOrderQuery,
+      size,
+    }: Pick<State, "forwardOrderQuery" | "reverseOrderQuery" | "size">) =>
+      action.reset(dispatch, { forwardOrderQuery, reverseOrderQuery, size }),
+    [dispatch]
+  );
 
   useEffect(() => {
     if (state.boundary) {

@@ -64,6 +64,17 @@ export const initializer = ({
 
 const reducer = (draft: State, action: Action): State | void => {
   switch (action.type) {
+    case "initialize": {
+      return initializer(action.payload);
+    }
+    case "startSubscribe": {
+      draft.subscribing = true;
+      return;
+    }
+    case "finishSubscribe": {
+      draft.subscribing = false;
+      return;
+    }
     case "subscribed": {
       const { boundary, idx, listener } = action.payload;
       if (draft.listeners[idx]) draft.listeners[idx]();
@@ -76,27 +87,16 @@ const reducer = (draft: State, action: Action): State | void => {
       draft.snaps[idx] = snap;
       return;
     }
-    case "startSubscribe": {
-      draft.subscribing = true;
-      return;
-    }
-    case "finishSubscribe": {
-      draft.subscribing = false;
-      return;
-    }
     case "catchError": {
       draft.error = action.payload.error;
       return;
     }
-    case "detachListeners": {
-      draft.listeners.forEach((listener) => listener());
-      return;
-    }
-    case "initialize": {
-      return initializer(action.payload);
-    }
     case "updateHasMore": {
       draft.hasMore = action.payload.hasMore;
+      return;
+    }
+    case "detachListeners": {
+      draft.listeners.forEach((listener) => listener());
       return;
     }
     default: {
@@ -173,14 +173,27 @@ const watchFirstDoc = (dispatch: Dispatch<Action>, state: State) => {
   );
 };
 
+const reset = (
+  dispatch: Dispatch<Action>,
+  {
+    forwardOrderQuery,
+    reverseOrderQuery,
+    size,
+  }: Pick<State, "forwardOrderQuery" | "reverseOrderQuery" | "size">
+) => {
+  dispatch({ type: "detachListeners" });
+  dispatch({ type: "initialize", payload: { forwardOrderQuery, reverseOrderQuery, size } });
+};
+
 export const action = {
   subscribe,
   subscribeMore,
   watchNextDoc,
   watchFirstDoc,
+  reset,
 };
 
-const docs = (snaps: State["snaps"]) => snaps.map((snap) => snap.docs.reverse()).flat();
+const docs = (state: State) => state.snaps.map((snap) => snap.docs.reverse()).flat();
 
 export const selector = {
   docs,
